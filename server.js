@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import mongoose from 'mongoose';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
@@ -23,19 +24,19 @@ const MONGO_URI = process.env.MONGO_URI;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-// Init Supabase
+// Init Supabase Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Init MongoDB
+// Init MongoDB Connection
 mongoose.connect(MONGO_URI)
   .then(() => console.log('MongoDB Terhubung...'))
   .catch(err => console.error('MongoDB Error:', err));
 
-// Schema MongoDB untuk User
-const UserSchema = new mongoose.Schema({
+// Schema MongoDB untuk UserSnippet
+const UserSnippetSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, unique: true, sparse: true },
-  password: { type: String }, // Kosong jika OAuth
+  password: { type: String }, // Kosong jika signup via OAuth
   avatar: { type: String, default: 'https://cdn.arulz.biz.id/files/X1F0Cn.png' },
   bio: { type: String, default: 'Developer Enthusiast' },
   googleId: { type: String },
@@ -43,21 +44,34 @@ const UserSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-const User = mongoose.model('User', UserSchema);
+const UserSnippet = mongoose.model('UserSnippet', UserSnippetSchema, 'usersnippet');
 
-// Middleware
+// Body Parser Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session Store Konfigurasi (Menggunakan MongoStore)
 app.use(session({
-  secret: 'secret_key_pastecode_arulz',
+  secret: process.env.SESSION_SECRET || 'secret_key_pastecode_arulz',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: MONGO_URI,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60 // Masa berlaku sesi (14 Hari)
+  }),
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 * 14,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
 }));
 
+// Inisialisasi Passport Middleware
 app.use(passport.initialize());
-app.use(passport.useSession());
+app.use(passport.session());
 
-// Static Files
+// Static Files Serving
 app.use(express.static(__dirname));
 
 // ==========================================
@@ -66,7 +80,7 @@ app.use(express.static(__dirname));
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findById(id);
+    const user = await UserSnippet.findById(id);
     done(null, user);
   } catch (err) {
     done(err, null);
@@ -76,9 +90,8 @@ passport.deserializeUser(async (id, done) => {
 // Local Strategy
 passport.use(new LocalStrategy(async (username, password, done) => {
   try {
-    const user = await User.findOne({ username });
+    const user = await UserSnippet.findOne({ username });
     if (!user) return done(null, false, { message: 'Username tidak ditemukan' });
-    
     if (!user.password) return done(null, false, { message: 'Silakan login dengan Google/GitHub' });
     
     const isMatch = await bcrypt.compare(password, user.password);
@@ -97,12 +110,12 @@ passport.use(new GoogleStrategy({
   callbackURL: '/auth/google/callback'
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    let user = await User.findOne({ googleId: profile.id });
+    let user = await UserSnippet.findOne({ googleId: profile.id });
     if (!user) {
-      user = await User.create({
+      user = await UserSnippet.create({
         username: profile.displayName.replace(/\s+/g, '').toLowerCase() + Math.floor(1000 + Math.random() * 9000),
-        email: profile.emails[0]?.value,
-        avatar: profile.photos[0]?.value,
+        email: profile.emails?.[0]?.value,
+        avatar: profile.photos?.[0]?.value,
         googleId: profile.id
       });
     }
@@ -119,9 +132,9 @@ passport.use(new GitHubStrategy({
   callbackURL: '/auth/github/callback'
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    let user = await User.findOne({ githubId: profile.id });
+    let user = await UserSnippet.findOne({ githubId: profile.id });
     if (!user) {
-      user = await User.create({
+      user = await UserSnippet.create({
         username: profile.username || 'github_user_' + Math.floor(1000 + Math.random() * 9000),
         email: profile.emails?.[0]?.value,
         avatar: profile.photos?.[0]?.value,
@@ -134,7 +147,7 @@ passport.use(new GitHubStrategy({
   }
 }));
 
-// Helper Auth Check Middleware
+// Auth Guard Middleware
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated()) return next();
   res.status(401).json({ status: false, message: 'Silakan login terlebih dahulu' });
@@ -148,14 +161,14 @@ app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.json({ status: false, message: 'Username & Password wajib diisi' });
 
-    const existingUser = await User.findOne({ username });
+    const existingUser = await UserSnippet.findOne({ username });
     if (existingUser) return res.json({ status: false, message: 'Username sudah digunakan' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ username, password: hashedPassword });
+    const newUser = await UserSnippet.create({ username, password: hashedPassword });
 
     req.login(newUser, (err) => {
-      if (err) return res.json({ status: false, message: 'Gagal auto login' });
+      if (err) return res.json({ status: false, message: 'Gagal auto-login' });
       return res.json({ status: true, message: 'Registrasi berhasil' });
     });
   } catch (err) {
@@ -166,7 +179,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', (req, res, next) => {
   passport.authenticate('local', (err, user, info) => {
     if (err) return res.json({ status: false, message: err.message });
-    if (!user) return res.json({ status: false, message: info.message || 'Login gagal' });
+    if (!user) return res.json({ status: false, message: info?.message || 'Login gagal' });
     
     req.login(user, (err) => {
       if (err) return res.json({ status: false, message: 'Error logging in' });
@@ -175,7 +188,7 @@ app.post('/api/login', (req, res, next) => {
   })(req, res, next);
 });
 
-// OAuth Google & GitHub Routes
+// OAuth Callback Routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login.html' }), (req, res) => {
   res.redirect('/home.html');
@@ -200,11 +213,11 @@ app.get('/api/user-status', (req, res) => {
   }
 });
 
-// Update Profile
+// Update Profile API
 app.post('/api/profile/update', isAuthenticated, async (req, res) => {
   try {
     const { bio, avatar } = req.body;
-    await User.findByIdAndUpdate(req.user.id, { bio, avatar });
+    await UserSnippet.findByIdAndUpdate(req.user.id, { bio, avatar });
     res.json({ status: true, message: 'Profil berhasil diperbarui' });
   } catch (err) {
     res.json({ status: false, message: err.message });
@@ -263,6 +276,7 @@ app.post('/api/pastecode/create', isAuthenticated, async (req, res) => {
 
 // PAGE ROUTING SLUGS
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/home', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 app.get('/snippet', (req, res) => res.sendFile(path.join(__dirname, 'snippet.html')));
 app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
