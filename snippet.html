@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Snippet - ArulzXD API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAF7EF; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        .brutal-border { border: 2.5px solid #eab308; }
+        .btn-brutalism {
+            background: #FFFDF8;
+            border: 2px solid #eab308;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .readme-body h1 { font-size: 1.5rem; font-weight: 900; margin-bottom: 0.5rem; }
+        .readme-body h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .readme-body p { font-size: 0.85rem; margin-bottom: 0.75rem; color: #374151; }
+    </style>
+</head>
+<body class="min-h-screen p-4 max-w-4xl mx-auto">
+
+    <a href="/home.html" class="btn-brutalism inline-block mb-4">← KEMBALI</a>
+
+    <div id="contentView">
+        <div class="text-center py-10 font-bold text-xs">Memuat Snippet...</div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const snippetId = urlParams.get('id');
+        const isNew = urlParams.get('new') === 'true';
+
+        async function initPage() {
+            if (isNew) {
+                renderNewForm();
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/pastecode');
+                const result = await res.json();
+                if (result.status) {
+                    const current = result.data.find(s => s.id === snippetId);
+                    if (current) renderDetail(current);
+                    else document.getElementById('contentView').innerHTML = '<div class="font-bold text-center">Snippet tidak ditemukan.</div>';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderDetail(s) {
+            document.getElementById('contentView').innerHTML = `
+                <!-- Profile Header -->
+                <div class="bg-[#FFFDF8] border-2 brutal-border rounded-xl p-4 mb-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <img src="${s.avatar || 'https://cdn.arulz.biz.id/files/X1F0Cn.png'}" class="w-10 h-10 rounded-xl border-2 brutal-border object-cover">
+                        <div>
+                            <span class="block text-xs font-black">Uploader: @${s.username || 'Anonymous'}</span>
+                            <span class="block text-[9px] font-bold text-zinc-500 font-mono">Dipublikasikan: ${s.date}</span>
+                        </div>
+                    </div>
+                    <span class="text-xs font-black uppercase bg-yellow-300 border-2 brutal-border px-3 py-1 rounded-lg">${s.language}</span>
+                </div>
+
+                <!-- Info Snippet -->
+                <div class="bg-[#FFFDF8] border-2 brutal-border rounded-xl p-5 mb-4">
+                    <h1 class="text-xl font-black mb-2">${s.title}</h1>
+                    <p class="text-xs font-semibold text-zinc-600">${s.desc || 'Tidak ada deskripsi.'}</p>
+                </div>
+
+                <!-- Block Kode -->
+                <div class="border-2 brutal-border rounded-xl overflow-hidden mb-6 bg-[#121212]">
+                    <div class="bg-[#FAF7EF] border-b-2 brutal-border px-4 py-2 flex justify-between items-center text-[10px] font-black">
+                        <span>SOURCE CODE</span>
+                        <button onclick="navigator.clipboard.writeText(\`${escapeQuotes(s.content)}\`)" class="btn-brutalism py-1 bg-yellow-300">SALIN KODE</button>
+                    </div>
+                    <pre class="line-numbers language-${s.language} p-4 m-0"><code id="codeBlock"></code></pre>
+                </div>
+
+                <!-- Section README.md (Jika Ada) -->
+                ${s.readme ? `
+                    <div class="bg-[#FFFDF8] border-2 brutal-border rounded-xl p-5">
+                        <div class="text-xs font-black border-b-2 brutal-border pb-2 mb-3">📄 README.md</div>
+                        <div class="readme-body leading-relaxed">${marked.parse(s.readme)}</div>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('codeBlock').textContent = s.content;
+            if (window.Prism) Prism.highlightElement(document.getElementById('codeBlock'));
+        }
+
+        function renderNewForm() {
+            document.getElementById('contentView').innerHTML = `
+                <form onsubmit="submitSnippet(event)" class="bg-[#FFFDF8] border-2 brutal-border rounded-2xl p-6">
+                    <h2 class="text-lg font-black uppercase mb-4">Buat Snippet Baru</h2>
+                    <div class="mb-3">
+                        <label class="block text-[10px] font-black uppercase mb-1">Judul Snippet *</label>
+                        <input type="text" id="title" required class="w-full p-2.5 text-xs font-bold border-2 brutal-border rounded-xl bg-white">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase mb-1">Bahasa *</label>
+                            <select id="language" class="w-full p-2.5 text-xs font-bold border-2 brutal-border rounded-xl bg-white">
+                                <option value="javascript">JavaScript</option>
+                                <option value="html">HTML</option>
+                                <option value="php">PHP</option>
+                                <option value="python">Python</option>
+                                <option value="css">CSS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black uppercase mb-1">Deskripsi Singkat</label>
+                            <input type="text" id="desc" class="w-full p-2.5 text-xs font-bold border-2 brutal-border rounded-xl bg-white">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-[10px] font-black uppercase mb-1">Konten Kode *</label>
+                        <textarea id="content" required rows="8" class="w-full p-3 text-xs code-font border-2 brutal-border rounded-xl bg-[#121212] text-sky-400 focus:outline-none"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-[10px] font-black uppercase mb-1">README.md (Markdown Supported)</label>
+                        <textarea id="readme" rows="5" placeholder="# Dokumentasi..." class="w-full p-3 text-xs border-2 brutal-border rounded-xl bg-white"></textarea>
+                    </div>
+                    <button type="submit" class="btn-brutalism w-full bg-yellow-300 py-3 text-xs">PUBLIKASIKAN SNIPPET</button>
+                </form>
+            `;
+        }
+
+        async function submitSnippet(e) {
+            e.preventDefault();
+            const payload = {
+                title: document.getElementById('title').value,
+                language: document.getElementById('language').value,
+                desc: document.getElementById('desc').value,
+                content: document.getElementById('content').value,
+                readme: document.getElementById('readme').value
+            };
+
+            const res = await fetch('/api/pastecode/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.status) window.location.href = `/snippet.html?id=${data.snippetId}`;
+        }
+
+        function escapeQuotes(str) {
+            return str.replace(/`/g, '\\`').replace(/\${/g, '\\${');
+        }
+
+        initPage();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+</body>
+</html>

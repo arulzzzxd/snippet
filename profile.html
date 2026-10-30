@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil Saya - ArulzXD Snippet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAF7EF; }
+        .brutal-border { border: 2.5px solid #eab308; }
+        .btn-brutalism {
+            background: #FFFDF8;
+            border: 2px solid #eab308;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 max-w-md mx-auto flex flex-col justify-center">
+
+    <a href="/home.html" class="btn-brutalism inline-block mb-4 self-start">← KEMBALI Halaman UTAMA</a>
+
+    <div class="bg-[#FFFDF8] border-2 brutal-border rounded-2xl p-6 shadow-md text-center">
+        <img id="avatarImg" src="https://cdn.arulz.biz.id/files/X1F0Cn.png" class="w-20 h-20 mx-auto rounded-2xl border-2 brutal-border object-cover mb-3">
+        <h2 id="usernameText" class="text-lg font-black uppercase">@username</h2>
+        <p id="bioText" class="text-xs text-zinc-600 font-semibold mb-4">Bio user...</p>
+
+        <form onsubmit="updateProfile(event)" class="text-left space-y-3 border-t-2 brutal-border pt-4">
+            <div>
+                <label class="block text-[10px] font-black uppercase mb-1">URL Avatar / Foto Profil</label>
+                <input type="text" id="avatarInput" class="w-full p-2.5 text-xs font-bold border-2 brutal-border rounded-xl bg-white">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black uppercase mb-1">Bio Profil</label>
+                <textarea id="bioInput" rows="3" class="w-full p-2.5 text-xs font-bold border-2 brutal-border rounded-xl bg-white"></textarea>
+            </div>
+            <button type="submit" class="btn-brutalism w-full bg-yellow-300 py-2.5">SIMPAN PERUBAHAN</button>
+        </form>
+
+        <a href="/api/logout" class="btn-brutalism block w-full bg-red-400 text-white mt-4 text-center">LOGOUT</a>
+    </div>
+
+    <script>
+        async function loadProfile() {
+            const res = await fetch('/api/user-status');
+            const data = await res.json();
+            if (data.loggedIn) {
+                document.getElementById('avatarImg').src = data.user.avatar;
+                document.getElementById('usernameText').innerText = '@' + data.user.username;
+                document.getElementById('bioText').innerText = data.user.bio || 'Tidak ada bio.';
+                
+                document.getElementById('avatarInput').value = data.user.avatar;
+                document.getElementById('bioInput').value = data.user.bio || '';
+            } else {
+                window.location.href = '/login.html';
+            }
+        }
+
+        async function updateProfile(e) {
+            e.preventDefault();
+            const avatar = document.getElementById('avatarInput').value;
+            const bio = document.getElementById('bioInput').value;
+
+            const res = await fetch('/api/profile/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ avatar, bio })
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.status) location.reload();
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>
