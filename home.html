@@ -54,9 +54,9 @@
                 <span class="font-black text-sm uppercase tracking-tight">ArulzXD Snippets</span>
             </a>
             <div class="flex items-center gap-2">
-                <a href="/snippet.html?new=true" class="btn-brutalism yellow-accent">+ BUAT SNIPPET</a>
+                <a href="/snippet?new=true" class="btn-brutalism yellow-accent">+ BUAT SNIPPET</a>
                 <div id="authNav">
-                    <a href="/login.html" class="btn-brutalism">LOGIN</a>
+                    <a href="/login" class="btn-brutalism">LOGIN</a>
                 </div>
             </div>
         </div>
@@ -91,14 +91,19 @@
         let allSnippets = [];
 
         async function fetchUserStatus() {
-            const res = await fetch('/api/user-status');
-            const data = await res.json();
-            if (data.loggedIn) {
-                document.getElementById('authNav').innerHTML = `
-                    <a href="/profile.html" class="flex items-center gap-2">
-                        <img src="${data.user.avatar}" class="w-8 h-8 rounded-lg border-2 brutal-border object-cover">
-                    </a>
-                `;
+            try {
+                const res = await fetch('/api/user-status', { credentials: 'include' });
+                const data = await res.json();
+                if (data.loggedIn && data.user) {
+                    document.getElementById('authNav').innerHTML = `
+                        <a href="/profile" class="flex items-center gap-2 border-2 brutal-border rounded-xl p-1 bg-[#FFFDF8]">
+                            <img src="${data.user.avatar || 'https://cdn.arulz.biz.id/files/X1F0Cn.png'}" class="w-6 h-6 rounded-lg object-cover">
+                            <span class="text-xs font-black px-1">${data.user.username}</span>
+                        </a>
+                    `;
+                }
+            } catch (err) {
+                console.error("Gagal mengecek status user:", err);
             }
         }
 
@@ -123,13 +128,13 @@
             }
 
             container.innerHTML = snippets.map(s => `
-                <div class="bg-[#FFFDF8] border-2 brutal-border rounded-xl p-4 shadow-sm cursor-pointer hover:translate-y-[-2px] transition-all" onclick="window.location.href='/snippet.html?id=${s.id}'">
+                <div class="bg-[#FFFDF8] border-2 brutal-border rounded-xl p-4 shadow-sm cursor-pointer hover:translate-y-[-2px] transition-all" onclick="window.location.href='/snippet?id=${s.id}'">
                     <div class="flex justify-between items-center mb-2">
                         <span class="text-[10px] font-black code-font px-2 py-0.5 rounded border border-black bg-yellow-300 uppercase">${s.language}</span>
                         <span class="text-[9px] font-bold text-zinc-500 font-mono">📅 ${s.date}</span>
                     </div>
                     <h3 class="font-extrabold text-sm mb-1 truncate">${s.title}</h3>
-                    <p class="text-[11px] font-medium text-zinc-600 mb-3 line-clamp-1">${s.desc || 'Tidak ada deskripsi'}</p>
+                    <p class="text-[11px] font-medium text-zinc-600 mb-3 line-clamp-1">${s.description || s.desc || 'Tidak ada deskripsi'}</p>
                     <div class="preview-box mb-3">${escapeHTML(s.content.substring(0, 120))}</div>
                     <div class="flex items-center justify-between border-t-2 brutal-border pt-2">
                         <div class="flex items-center gap-2">
