@@ -36,7 +36,7 @@ mongoose.connect(MONGO_URI)
 const UserSnippetSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, unique: true, sparse: true },
-  password: { type: String }, // Kosong jika signup via OAuth
+  password: { type: String },
   avatar: { type: String, default: 'https://cdn.arulz.biz.id/files/X1F0Cn.png' },
   bio: { type: String, default: 'Developer Enthusiast' },
   googleId: { type: String },
@@ -50,7 +50,7 @@ const UserSnippet = mongoose.model('UserSnippet', UserSnippetSchema, 'usersnippe
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session Store Konfigurasi (Menggunakan MongoStore)
+// Session Store Konfigurasi
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret_key_pastecode_arulz',
   resave: false,
@@ -58,7 +58,7 @@ app.use(session({
   store: MongoStore.create({
     mongoUrl: MONGO_URI,
     collectionName: 'sessions',
-    ttl: 14 * 24 * 60 * 60 // Masa berlaku sesi (14 Hari)
+    ttl: 14 * 24 * 60 * 60
   }),
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 14,
@@ -246,7 +246,7 @@ app.get('/api/pastecode', async (req, res) => {
 // CREATE NEW SNIPPET
 app.post('/api/pastecode/create', isAuthenticated, async (req, res) => {
   try {
-    const { title, desc, content, language, readme } = req.body;
+    const { title, description, desc, content, language, readme } = req.body;
     
     if (!title || !content) {
       return res.json({ status: false, message: 'Judul dan Konten Kode wajib diisi!' });
@@ -256,7 +256,7 @@ app.post('/api/pastecode/create', isAuthenticated, async (req, res) => {
     const newSnippet = {
       id: snippetId,
       title,
-      desc: desc || '',
+      description: description || desc || '',
       content,
       language: language || 'javascript',
       readme: readme || '',
